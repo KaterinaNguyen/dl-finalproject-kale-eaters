@@ -13,3 +13,4 @@ ptflops
 dataclasses
 natsort
 opencv-python
+tensorflow-metal

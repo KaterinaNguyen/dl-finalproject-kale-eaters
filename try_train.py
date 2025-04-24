@@ -2,7 +2,7 @@ import tensorflow as tf
 from data.dataset_loader import get_dataset
 from models.ast_tf import ASTModel
 import os
-
+from tqdm import tqdm
 os.makedirs("outputs", exist_ok=True)
 
 input_dir = "DID-MDN-split/input"
@@ -17,6 +17,7 @@ save_model_path = "ast_model_trained.h5"
 print("Loading dataset...")
 train_ds, val_ds, _ = get_dataset(input_dir, gt_dir, patch_size=patch_size, batch_size=batch_size)
 
+steps_per_epoch = tf.data.experimental.cardinality(train_ds).numpy()
 print("Building AST model...")
 model = ASTModel()
 _ = model(tf.keras.Input(shape=(patch_size, patch_size, 3)))
@@ -48,12 +49,12 @@ print("\nStarting training...")
 for epoch in range(epochs):
     print(f"\nEpoch {epoch + 1}/{epochs}")
     epoch_loss = 0.0
-    for step, (degraded, clean) in enumerate(train_ds):
+    for step, (degraded, clean) in enumerate(tqdm(train_ds, total=steps_per_epoch, desc=f"Epoch {epoch+1}/{epochs}", unit="step")):
         loss = train_step(degraded, clean)
         epoch_loss += loss.numpy()
 
         if step % log_freq == 0:
-            print(f"Step {step}, Loss: {loss.numpy():.6f}")
+            tqdm.write(f"  step {step:4d} — loss: {loss:.6f}")
 
     avg_loss = epoch_loss / (step + 1)
     print(f"Epoch {epoch + 1} Loss: {avg_loss:.6f}")
