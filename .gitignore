@@ -1,3 +1,6 @@
 DID-MDN-all/
 DID-MDN-split/
 tf-venv/
+data/__pycache__/
+models/__pycache__/
+*.pyc
