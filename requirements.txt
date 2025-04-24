@@ -14,3 +14,4 @@ dataclasses
 natsort
 opencv-python
 tensorflow-metal
+tensorflow
