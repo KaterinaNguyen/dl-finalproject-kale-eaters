@@ -5,6 +5,11 @@ import os
 from tqdm import tqdm
 os.makedirs("outputs", exist_ok=True)
 
+tf.config.set_visible_devices([], 'GPU')
+print("TensorFlow version:", tf.__version__)
+print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
+print("GPU Devices:", tf.config.list_physical_devices('GPU'))
+
 input_dir = "DID-MDN-split/input"
 gt_dir = "DID-MDN-split/gt"
 patch_size = 64
