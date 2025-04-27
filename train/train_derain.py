@@ -1,11 +1,11 @@
 import os, datetime, argparse, json
 import tensorflow as tf
-
+from tqdm import tqdm
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.dataset_loader import get_dataset
-
+import time
 parser = argparse.ArgumentParser()
 parser.add_argument('--train_dir', type=str, default='DID-MDN-split/input')
 parser.add_argument('--gt_dir', type=str, default='DID-MDN-split/gt')
@@ -21,7 +21,6 @@ args = parser.parse_args()
 os.makedirs(args.model_dir, exist_ok=True)
 
 # Enabling GPU
-tf.config.set_visible_devices([], 'GPU')
 # tf.keras.mixed_precision.set_global_policy('mixed_float16')
 # tf.debugging.set_log_device_placement(True)
 
@@ -46,7 +45,8 @@ _ = model(tf.random.uniform([1, args.patch, args.patch, 3]))
 
 total_steps   = args.epochs * tf.data.experimental.cardinality(train_ds).numpy()
 warmup_steps  = args.warmup_ep * tf.data.experimental.cardinality(train_ds).numpy()
-
+train_steps_per_epoch = tf.data.experimental.cardinality(train_ds).numpy()
+val_steps_per_epoch   = tf.data.experimental.cardinality(val_ds).numpy()
 def lr_schedule(step):
     step = tf.cast(step, tf.float32)
     lr_base = 0.5 * args.lr_init * (1 + tf.cos(3.14159265 *
@@ -74,13 +74,12 @@ def train_step(inp, gt):
     with tf.GradientTape() as tape:
         pred = model(inp, training=True)
         loss = charbonnier_loss(gt, pred)
-        grads = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    scaled_grads = tape.gradient(loss, model.trainable_variables)
-    grads = optimizer.get_unscaled_gradients(scaled_grads)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    train_loss(loss)
+        scaled_loss = optimizer.scale_loss(loss)
 
+    scaled_grads = tape.gradient(scaled_loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(scaled_grads, model.trainable_variables))
+    train_loss.update_state(loss)
+    step_counter.assign_add(1)
 @tf.function
 def val_step(inp, gt):
     pred = model(inp, training=False)
@@ -88,17 +87,42 @@ def val_step(inp, gt):
                          tf.clip_by_value(gt,   0.,1.), max_val=1.)
     val_psnr(psnr)
 
-############## Training Loop ##############
+# Training loop
 for epoch in range(1, args.epochs + 1):
+    print(f"\n=== Epoch {epoch:03d}/{args.epochs} ===")
+    epoch_start = time.time()
+    
     train_loss.reset_state()
     val_psnr.reset_state()
 
-    for x, y in train_ds:
+    t = tqdm(train_ds, total=train_steps_per_epoch, desc="  train", unit="step")
+    step_times = []
+    
+    for step, (x, y) in enumerate(t, start=1):
+        step_start = time.time()
         train_step(x, y)
+        step_times.append(time.time() - step_start)
+        
+        t.set_postfix({
+            'step': step,
+            'loss': f"{train_loss.result():.4f}",
+            't/step': f"{(sum(step_times)/len(step_times)):.3f}s"
+        })
 
+    v = tqdm(val_ds, total=val_steps_per_epoch, desc="  valid", unit="step")
     for x, y in val_ds:
         val_step(x, y)
 
+    epoch_time = time.time() - epoch_start
+    avg_time_per_step = epoch_time / train_steps_per_epoch
+    
+    print((
+        f"Epoch {epoch:03d} done in {epoch_time:.1f}s "
+        f"({avg_time_per_step:.3f}s/step) | "
+        f"loss={train_loss.result():.5f} | "
+        f"val-psnr={val_psnr.result():.2f} dB"
+    ))
+    
     template = ("Epoch {:03d} | loss {:.5f} | val-psnr {:.2f} dB | lr {:.6e}")
     print(template.format(epoch,
                           train_loss.result(),
