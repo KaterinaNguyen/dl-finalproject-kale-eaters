@@ -90,8 +90,6 @@ def main(cfg):
     t0 = time.time()
 
     for idx, (features, gt) in enumerate(tqdm(test_ds, desc="Evaluating", unit="img")):
-        if idx >= 75:
-            break
         img = features["image"]            
         crops, starts, (H, W) = split_image(img, cfg.crop, cfg.overlap)
 

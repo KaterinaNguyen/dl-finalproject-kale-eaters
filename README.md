@@ -61,10 +61,21 @@ pip install -r requirements.txt
 - Navigate to `DID-MDN-split/gt` to access the 'ground truth' images
 - Navigate to `DID-MDN-split/input` tp access the synthetically altered rain images
 
-### Evaluation
+### 5. Evaluation
 
-- Run:
+Run:
 
-## Poster
+```zsh
+python testing_derain.py --input_dir DID-MDN-split --weights train_v2_checkpoints_ast/ckpt-10 --crop 64 --overlap 16 --batch_crops 8 --save_images
+```
 
-![Poster](poster.png)
+## Relevant Files
+
+- `CSCI 1470 Final Writeup_Reflection.pdf`
+- `poster.jpg`
+- `/data/dataset_loader.py`: data preprocessing
+- `split_pairs_in_dataset.py`: splitting ground truth and input images
+- `/models`: model components
+- `train_derain.py`: model training
+- `testing_derain.py`: testing and evaluation
+- `/eval_results`: model outputs from testing
