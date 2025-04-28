@@ -46,6 +46,9 @@ pip install -r requirements.txt
 - Navigate to `DID-MDN-split/gt` to access the 'ground truth' images
 - Navigate to `DID-MDN-split/input` tp access the synthetically altered rain images
 
+### Evaluatoin
+- Run: 
+
 ### UPDATES:
 - Verified that dataset_loader.py seems to work by checking that batch shapes print out when I run:
 ```zsh

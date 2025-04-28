@@ -12,12 +12,10 @@ def get_dataset(input_dir, gt_dir, patch_size=256, batch_size=4, split=(0.8, 0.1
     input_files = sorted([f for f in os.listdir(input_dir) if f.lower().endswith(".png")])
     gt_files = sorted([f for f in os.listdir(gt_dir) if f.lower().endswith(".png")])
 
-    # Match files based on name
     common_files = sorted(list(set(input_files).intersection(set(gt_files))))
     input_paths = [os.path.join(input_dir, f) for f in common_files]
     gt_paths = [os.path.join(gt_dir, f) for f in common_files]
 
-    # Shuffle and split
     combined = list(zip(input_paths, gt_paths))
     random.seed(seed)
     random.shuffle(combined)
@@ -40,28 +38,31 @@ def make_dataset(pairs, patch_size, batch_size, is_training):
         for inp_path, gt_path in pairs:
             inp = load_image(inp_path)
             gt = load_image(gt_path)
-            yield inp, gt
+            yield inp, gt, inp_path 
 
-    def preprocess(inp, gt):
+    def preprocess(inp, gt, path):
         inp = tf.convert_to_tensor(inp, dtype=tf.float32)
         gt = tf.convert_to_tensor(gt, dtype=tf.float32)
 
         stacked = tf.stack([inp, gt], axis=0)
 
-        if is_training:
+        if is_training and patch_size > 0:
             stacked = tf.image.random_crop(stacked, size=(2, patch_size, patch_size, 3))
-            stacked = tf.image.random_flip_left_right(stacked)
-            stacked = tf.image.random_flip_up_down(stacked)
-        else:
+            if tf.random.uniform(()) > 0.5:
+                stacked = tf.reverse(stacked, axis=[2])
+            if tf.random.uniform(()) > 0.5:
+                stacked = tf.reverse(stacked, axis=[1])
+        elif patch_size > 0:
             stacked = tf.image.resize_with_crop_or_pad(stacked, patch_size, patch_size)
-
-        return stacked[0], stacked[1]
+        
+        return {'image': stacked[0], 'filename': path}, stacked[1]
 
     dataset = tf.data.Dataset.from_generator(
         generator,
         output_signature=(
             tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),
-            tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32)
+            tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),
+            tf.TensorSpec(shape=(), dtype=tf.string) 
         )
     )
 
